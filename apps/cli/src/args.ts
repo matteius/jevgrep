@@ -4,11 +4,13 @@ import { providers, customProviderId, isCredentialProvider } from "@repo/core/pr
 import { CliError } from "./errors";
 import { DEFAULT_MAX_OUTPUT_BYTES, DEFAULT_MAX_SOURCE_BYTES } from "./render";
 import type { AuthOptions } from "./auth";
+import { isLocalProvider, type LocalProvider } from "./local-provider";
 
 const credentialProviders = [...Object.keys(providers), customProviderId];
 
 export type Command =
-  | { kind: "help" | "version" | "doctor" | "cache-clear" }
+  | { kind: "help" | "version" | "cache-clear" }
+  | { kind: "doctor"; localProvider?: LocalProvider; model?: string }
   | { kind: "skill"; agents: string[]; global: boolean; yes: boolean }
   | ({ kind: "auth" } & AuthOptions)
   | { kind: "files"; root: string; list?: boolean; policy: NonNullable<SearchInput["policy"]> }
@@ -22,6 +24,9 @@ export type Command =
       maxSourceBytes: number;
       maxOutputBytes: number;
       noLocations: boolean;
+      localProvider?: LocalProvider;
+      model?: string;
+      explicitMaxRequests: boolean;
       policy: NonNullable<SearchInput["policy"]>;
     };
 
@@ -37,6 +42,7 @@ export function parseCommand(args: string[]): Command {
         version: { type: "boolean" },
         stdin: { type: "boolean" },
         provider: { type: "string" },
+        "local-provider": { type: "string" },
         "base-url": { type: "string" },
         model: { type: "string" },
         agent: { type: "string", multiple: true },
@@ -102,9 +108,18 @@ export function parseCommand(args: string[]): Command {
     return { kind: "skill", agents, global: values.global ?? false, yes: values.yes ?? false };
   }
   if (first === "doctor") {
-    if (positionals.length !== 1 || keys.length)
-      throw new CliError("This command takes no arguments.");
-    return { kind: first };
+    if (positionals.length !== 1 || keys.some((key) => !["local-provider", "model"].includes(key)))
+      throw new CliError("Usage: jg doctor [--local-provider kilo|codex|claude] [--model ID].");
+    if (values["local-provider"] === undefined) {
+      if (values.model !== undefined) throw new CliError("--model needs --local-provider.");
+      return { kind: first };
+    }
+    if (!isLocalProvider(values["local-provider"])) throw new CliError("Unknown local provider.");
+    return {
+      kind: first,
+      localProvider: values["local-provider"],
+      ...(values.model ? { model: values.model } : {}),
+    };
   }
   if (first === "files") {
     if (
@@ -139,7 +154,7 @@ export function parseCommand(args: string[]): Command {
     positionals.length > 2 ||
     values.stdin ||
     values.list ||
-    keys.some((key) => ["agent", "global", "yes", "provider", "base-url", "model"].includes(key))
+    keys.some((key) => ["agent", "global", "yes", "provider", "base-url"].includes(key))
   )
     throw new CliError('Usage: jg "question" [root]. Run jg --help.');
   let concurrency: number | undefined;
@@ -172,6 +187,10 @@ export function parseCommand(args: string[]): Command {
   )
     throw new CliError("--max-output-bytes must be 0 (unlimited) or at least 256.");
   const policy = policyFrom(values);
+  if (values["local-provider"] !== undefined && !isLocalProvider(values["local-provider"]))
+    throw new CliError("Unknown local provider.");
+  if (values.model !== undefined && values["local-provider"] === undefined)
+    throw new CliError("--model needs --local-provider.");
   return {
     kind: "search",
     query: first,
@@ -179,9 +198,14 @@ export function parseCommand(args: string[]): Command {
     noCache: values["no-cache"] ?? false,
     ...(concurrency === undefined ? {} : { concurrency }),
     maxRequests,
+    explicitMaxRequests: rawRequests !== undefined,
     maxSourceBytes,
     maxOutputBytes,
     noLocations: values["no-locations"] ?? false,
+    ...(values["local-provider"]
+      ? { localProvider: values["local-provider"] as LocalProvider }
+      : {}),
+    ...(values.model ? { model: values.model } : {}),
     policy,
   };
 }
@@ -236,6 +260,13 @@ Auth automation:
   Custom endpoints must use https://; http:// is allowed only for localhost
   and 127.0.0.1. Auth and doctor name the endpoint host, never the key.
   Saved credentials only; provider key/URL environment variables are ignored.
+
+Subscription-backed local CLIs (no Jev API key):
+  jg doctor --local-provider kilo|codex|claude [--model ID]
+  jg "question" [root] --local-provider kilo|codex|claude [--model ID]
+  Local CLI evaluation starts one agent process per request. The default is
+  one concurrent process and 12 requests per search; override with the usual
+  --concurrency and --max-requests flags. Results are experimental.
 
 Skill installation options:
   --agent NAME    Target an agent (repeat for multiple agents)

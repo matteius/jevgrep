@@ -11,6 +11,7 @@ import { version } from "../package.json";
 import { installSkill } from "./skill";
 import { createProgress } from "./progress";
 import { exitCodeForResult } from "./exit-code";
+import { createLocalEvaluator, localProviders } from "./local-provider";
 
 globalThis.AI_SDK_LOG_WARNINGS = false;
 
@@ -63,13 +64,18 @@ async function main() {
       return write("Cache cleared.\n");
     }
     case "doctor": {
-      const credentials = await loadCredentials();
-      const endpoint = endpointFor(credentials);
       const { createEvaluator, EvaluationFailure } = await import("@repo/core");
-      const evaluator = createEvaluator({
-        ...credentials,
-        signal: controller.signal,
-      });
+      const credentials = command.localProvider ? undefined : await loadCredentials();
+      const label = command.localProvider
+        ? localProviders[command.localProvider].label
+        : endpointFor(credentials!).label;
+      const evaluator = command.localProvider
+        ? createLocalEvaluator({
+            provider: command.localProvider,
+            model: command.model,
+            signal: controller.signal,
+          })
+        : createEvaluator({ ...credentials!, signal: controller.signal });
       try {
         const answers = await evaluator.evaluate({
           state: { source: "export function recordEvent(event) { events.push(event); }" },
@@ -81,23 +87,27 @@ async function main() {
           },
         });
         if (!(answers.relevant! > 0.5))
-          throw new CliError(
-            `${endpoint.label} returned an unexpected answer to the connection check.`,
-          );
-        await write(`Jev connection verified through ${endpoint.label}.\n`);
+          throw new CliError(`${label} returned an unexpected answer to the connection check.`);
+        await write(
+          command.localProvider
+            ? `Local scoring verified through ${label}.\n`
+            : `Jev connection verified through ${label}.\n`,
+        );
       } catch (error) {
         if (error instanceof CliError) throw error;
         if (error instanceof EvaluationFailure && error.diagnostic) {
           const { statusCode, message } = error.diagnostic;
           throw new CliError(
-            `Jev connection check failed through ${endpoint.label} (HTTP ${statusCode}).\n` +
+            `Jev connection check failed through ${label} (HTTP ${statusCode}).\n` +
               (message
                 ? `Provider: ${message}`
                 : "Check your saved key, model access, and provider billing."),
           );
         }
         throw new CliError(
-          `Jev connection check failed through ${endpoint.label}. Check your saved key, model access, and network.`,
+          command.localProvider
+            ? `Local scoring check failed through ${label}. Check that its CLI is installed, signed in, and able to run the selected model.`
+            : `Jev connection check failed through ${label}. Check your saved key, model access, and network.`,
         );
       }
       return;
@@ -126,20 +136,29 @@ async function main() {
       return;
     }
     case "search": {
-      const credentials = await loadCredentials();
       const { retrieve, createEvaluator, createEvaluationCache } = await import("@repo/core");
       const cache = createEvaluationCache({
         directory: storageDirectory("cache"),
         enabled: !command.noCache,
       });
-      const evaluator = createEvaluator({
-        cache,
-        concurrency: command.concurrency,
-        requestLimit: command.maxRequests,
-        policyVersion: JSON.stringify(command.policy),
-        ...credentials,
-        signal: controller.signal,
-      });
+      const evaluator = command.localProvider
+        ? createLocalEvaluator({
+            provider: command.localProvider,
+            model: command.model,
+            cache: command.model ? cache : undefined,
+            concurrency: command.concurrency,
+            requestLimit: command.explicitMaxRequests ? command.maxRequests : 12,
+            policyVersion: JSON.stringify(command.policy),
+            signal: controller.signal,
+          })
+        : createEvaluator({
+            cache,
+            concurrency: command.concurrency,
+            requestLimit: command.maxRequests,
+            policyVersion: JSON.stringify(command.policy),
+            ...(await loadCredentials()),
+            signal: controller.signal,
+          });
       const progress = terminalProgress();
       progress.start();
       let result: RetrievalResult;

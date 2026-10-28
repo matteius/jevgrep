@@ -18,6 +18,7 @@ test("search accepts independent policy flags and a dash-prefixed root after --"
     root: "-tree",
     noCache: true,
     maxRequests: 1000,
+    explicitMaxRequests: false,
     maxSourceBytes: 12,
     maxOutputBytes: 256000,
     noLocations: false,

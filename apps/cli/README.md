@@ -110,6 +110,22 @@ source. Locations are reading leads, not a checklist. Omitted excerpts are marke
 be useful. Read what it supplies, then fill specific gaps with ordinary tools.
 Application output goes to stdout; `jg` does not create a report file.
 
+## Experimental local CLI providers
+
+Use `--local-provider kilo`, `--local-provider codex`, or `--local-provider
+claude` with `jg doctor` or a search to use an existing CLI login. No `jg auth`
+step is needed for these modes. `--model ID` is passed to the CLI and enables
+answer caching for that exact model; without it, answers are not cached because
+the CLI's default model can change. The default local limits are one process at
+a time and 12 requests per search. The ordinary `--concurrency` and
+`--max-requests` flags override them.
+
+The local modes are experimental: prompted models do not provide Jev's native
+scores, and a search can consume many subscription requests. Kilo stores normal
+session data and has substantial agent startup context. `--pure` changes output
+formatting, not that context. Check which account and
+model each CLI is using before searching source you do not intend to send.
+
 ## Agent skill
 
 **Installing the CLI is only half of agent setup: install the skill too.**

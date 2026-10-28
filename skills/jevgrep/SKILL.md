@@ -14,9 +14,22 @@ npm install --global @dzhng/jevgrep@latest
 jg --version
 ```
 
-If credentials are missing, ask the user to run `jg auth` in their terminal to
-choose a provider and enter its key. Authentication is interactive and uses saved
-credentials, not environment variables. Do not request API keys in chat.
+The npm release above is the upstream version and does not include this fork's
+local provider flags. To use those flags, build this fork with `bun run build`
+and install its CLI with `npm install --global ./apps/cli` from the repo root.
+
+If using the standard Jev transport and credentials are missing, ask the user
+to run `jg auth` in their terminal to choose a provider and enter its key.
+Authentication is interactive and uses saved credentials, not environment
+variables. Do not request API keys in chat.
+
+This fork also supports `--local-provider kilo|codex|claude` on searches and
+`jg doctor`. These modes use the selected CLI's existing login and need no Jev
+key. Use `--model ID` when a stable model is available; it enables answer
+caching. Local scoring is experimental, is limited to 12 requests by default,
+and can consume substantial subscription usage. The original Jev benchmark
+does not apply to it. Run `jg doctor --local-provider NAME` before a search,
+and keep searches narrow.
 
 ## Search
 

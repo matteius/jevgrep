@@ -2,6 +2,9 @@
 
 # jevgrep
 
+This fork also has experimental local CLI providers. The benchmark figures below
+measure the original Jev transport; they do not describe the local providers.
+
 [![npm](https://img.shields.io/npm/v/@dzhng/jevgrep?style=flat-square&color=ef5638)](https://www.npmjs.com/package/@dzhng/jevgrep)
 [![MIT license](https://img.shields.io/badge/license-MIT-blue?style=flat-square)](LICENSE)
 [![Node.js 22+](https://img.shields.io/badge/Node.js-22%2B-339933?style=flat-square)](apps/cli/README.md)
@@ -91,6 +94,47 @@ not a generated answer or a guarantee that every relevant file was found.
 
 When you already know an exact symbol or path, a direct read or `rg` search may be
 all you need. Jevgrep is most useful for questions that span unfamiliar files.
+
+## Experimental local CLI providers
+
+This fork can use an already signed-in Kilo, Codex, or Claude Code CLI to score
+source without a Jev API key. To try this branch locally, build it with Bun and
+install the built CLI from this checkout:
+
+```sh
+bun install --frozen-lockfile
+bun run build
+npm install --global ./apps/cli
+```
+
+That local install replaces any existing `jg` command in the same npm prefix.
+Install and sign in to the chosen CLI separately, then run:
+
+```sh
+jg doctor --local-provider kilo
+jg "Where is access checked before a session starts?" . --local-provider kilo --model openai/gpt-6-luna-fast
+
+# Or use an existing Codex or Claude Code login:
+jg doctor --local-provider codex
+jg doctor --local-provider claude --model haiku
+```
+
+`--model` is optional and passes a model ID to the selected CLI. An explicit
+model also enables Jevgrep's answer cache; an unspecified CLI default is not
+stable enough to cache safely. Local providers start one CLI process at a time
+and stop after 12 requests per search by default. Use `--max-requests` and
+`--concurrency` to change those bounds. Each process uses the selected CLI's
+normal account, limits, and billing configuration. Kilo's agent startup can
+consume substantial context even for a small scoring request (about 17,000
+input tokens in one local probe). `--pure` formats Kilo's output; it does not
+remove the agent's system prompt. Codex and Claude also add agent context.
+
+These models return prompted numeric scores rather than Jev's native relevance
+judgments. The existing retrieval thresholds were tuned for Jev, so results
+need a comparative evaluation before claiming equivalent coverage or savings.
+Source in a Kilo request is passed through an owner-only temporary attachment;
+Codex and Claude receive it on stdin. The selected CLI may retain its own
+session data or send source to its model provider.
 
 ## What we measured
 
