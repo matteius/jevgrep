@@ -123,7 +123,9 @@ jg doctor --local-provider claude --model haiku
 model also enables Jevgrep's answer cache; an unspecified CLI default is not
 stable enough to cache safely. Local providers start one CLI process at a time
 and stop after 12 requests per search by default. Use `--max-requests` and
-`--concurrency` to change those bounds. Each process uses the selected CLI's
+`--concurrency` to change those bounds. Kilo scores at most four questions per
+process, so larger question groups use several requests against that limit.
+Each process uses the selected CLI's
 normal account, limits, and billing configuration. Kilo's agent startup can
 consume substantial context even for a small scoring request. This fork gives
 Kilo a temporary, one-step scoring agent with only read permission. In one

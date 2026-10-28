@@ -15,6 +15,7 @@ test("doctor checks a local Kilo provider without saved API credentials", async 
         'const fs = require("node:fs");\n' +
         'const args = process.argv; const file = args[args.indexOf("--file") + 1];\n' +
         'fs.writeFileSync(process.env.JG_PROBE, JSON.stringify({args, prompt:file ? fs.readFileSync(file,"utf8") : "", config:process.env.KILO_CONFIG_CONTENT}));\n' +
+        'console.log(JSON.stringify({type:"text",part:{text:"{\\\"relevant\\\":0.05}"}}));\n' +
         'console.log(JSON.stringify({type:"text",part:{text:"{\\\"relevant\\\":0.95}"}}));\n',
     );
     await chmod(command, 0o755);
@@ -241,6 +242,60 @@ test("search retrieves source through a local CLI without Jev credentials", asyn
     expect(stdout).toContain("auth.ts");
     expect(stdout).toContain("export function authorize");
     expect(stdout).toContain("End context.");
+  } finally {
+    await rm(home, { recursive: true, force: true });
+  }
+});
+
+test("Kilo scores large question groups in batches it can answer completely", async () => {
+  const home = await mkdtemp(join(tmpdir(), "jevgrep-local-batches-"));
+  try {
+    const bin = join(home, "bin");
+    await mkdir(bin);
+    const command = join(bin, "kilo");
+    await writeFile(
+      command,
+      "#!/usr/bin/env node\n" +
+        'const fs = require("node:fs");\n' +
+        'const args = process.argv; const file = args[args.indexOf("--file") + 1];\n' +
+        'const prompt = fs.readFileSync(file, "utf8");\n' +
+        "const questions = JSON.parse(prompt.match(/^Questions: (.+)$/m)[1]);\n" +
+        'fs.appendFileSync(process.env.JG_PROBE, JSON.stringify(Object.keys(questions)) + "\\n");\n' +
+        "const scores = Object.fromEntries(Object.keys(questions).slice(0, 4).map(id => [id, 0.95]));\n" +
+        'console.log(JSON.stringify({type:"text",part:{text:JSON.stringify(scores)}}));\n',
+    );
+    await chmod(command, 0o755);
+    const script = join(home, "score.ts");
+    await writeFile(
+      script,
+      `import { createLocalEvaluator } from ${JSON.stringify(join(import.meta.dir, "../src/local-provider.ts"))};\n` +
+        'const questions = Object.fromEntries(Array.from({length: 8}, (_, i) => [`q${i}`, {type:"boolean", instructions:`Question ${i}`}])) as Record<string, {type:"boolean"; instructions:string}>;\n' +
+        'const evaluator = createLocalEvaluator({provider:"kilo", signal:new AbortController().signal, requestLimit:4});\n' +
+        'const scores = await evaluator.evaluate({state:{source:"sample"}, questions});\n' +
+        "console.log(JSON.stringify({scores, requests:evaluator.requests}));\n",
+    );
+    const probe = join(home, "calls.jsonl");
+    const child = Bun.spawn([process.execPath, script], {
+      cwd: home,
+      env: { ...process.env, PATH: `${bin}${delimiter}${process.env.PATH}`, JG_PROBE: probe },
+      stdout: "pipe",
+      stderr: "pipe",
+    });
+    const [stdout, stderr, code] = await Promise.all([
+      new Response(child.stdout).text(),
+      new Response(child.stderr).text(),
+      child.exited,
+    ]);
+    expect(code).toBe(0);
+    expect(stderr).toBe("");
+    const result = JSON.parse(stdout);
+    expect(Object.keys(result.scores)).toHaveLength(8);
+    expect(result.requests).toBe(2);
+    const calls = (await readFile(probe, "utf8")).trim().split("\n").map(JSON.parse);
+    expect(calls).toEqual([
+      ["q0", "q1", "q2", "q3"],
+      ["q4", "q5", "q6", "q7"],
+    ]);
   } finally {
     await rm(home, { recursive: true, force: true });
   }

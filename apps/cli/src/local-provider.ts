@@ -173,17 +173,26 @@ async function runCli(
       child.once("close", resolve);
     });
     if (oversized || code !== 0) throw new Error("Local CLI request failed");
-    let answer: string;
-    if (provider === "codex") answer = await readFile(outputFile, "utf8");
-    else if (provider === "claude") answer = JSON.parse(stdout).result;
-    else
-      answer = stdout
+    if (provider === "kilo") {
+      const texts = stdout
         .split(/\r?\n/)
         .filter(Boolean)
         .map((line) => JSON.parse(line))
         .filter((event) => event.type === "text" && typeof event.part?.text === "string")
-        .map((event) => event.part.text)
-        .join("");
+        .map((event) => event.part.text as string);
+      for (const candidate of [texts.at(-1), texts.join("")]) {
+        if (!candidate) continue;
+        try {
+          return scoresFrom(candidate, request);
+        } catch {
+          // Some CLIs stream one JSON answer in parts; try the joined text next.
+        }
+      }
+      throw new Error("Kilo CLI returned no complete score map");
+    }
+    let answer: string;
+    if (provider === "codex") answer = await readFile(outputFile, "utf8");
+    else answer = JSON.parse(stdout).result;
     if (typeof answer !== "string") throw new Error("Local CLI returned no answer");
     return scoresFrom(answer, request);
   } finally {
@@ -238,7 +247,7 @@ export function createLocalEvaluator(options: {
           model: options.model ?? "default",
           policyVersion: options.policyVersion ?? "1",
           protocol: "local-cli-v1",
-          promptVersion: "score-v1",
+          promptVersion: options.provider === "kilo" ? "score-v2-batched" : "score-v1",
         },
       };
       const cached = await options.cache?.get(cacheInput);
@@ -256,17 +265,30 @@ export function createLocalEvaluator(options: {
       }
       const release = await acquire();
       try {
-        if (options.signal.aborted) throw new EvaluationFailure("cancelled");
-        if (requests >= (options.requestLimit ?? 12)) throw new EvaluationFailure("request-limit");
-        await policy?.beforeAttempt?.();
-        requests++;
-        const scores = await runCli(
-          options.provider,
-          options.model,
-          request,
-          options.signal,
-          options.timeoutMs ?? 90_000,
-        );
+        const entries = Object.entries(request.questions);
+        const batchSize = options.provider === "kilo" ? 4 : Math.max(entries.length, 1);
+        const scores: Record<string, number> = {};
+        for (let start = 0; start < entries.length; start += batchSize) {
+          if (options.signal.aborted) throw new EvaluationFailure("cancelled");
+          if (requests >= (options.requestLimit ?? 12))
+            throw new EvaluationFailure("request-limit");
+          await policy?.beforeAttempt?.();
+          requests++;
+          const batch = {
+            ...request,
+            questions: Object.fromEntries(entries.slice(start, start + batchSize)),
+          } as Request;
+          Object.assign(
+            scores,
+            await runCli(
+              options.provider,
+              options.model,
+              batch,
+              options.signal,
+              options.timeoutMs ?? 90_000,
+            ),
+          );
+        }
         await options.cache?.put(cacheInput, scores);
         return scores;
       } catch (error) {

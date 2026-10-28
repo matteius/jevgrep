@@ -118,7 +118,8 @@ step is needed for these modes. `--model ID` is passed to the CLI and enables
 answer caching for that exact model; without it, answers are not cached because
 the CLI's default model can change. The default local limits are one process at
 a time and 12 requests per search. The ordinary `--concurrency` and
-`--max-requests` flags override them.
+`--max-requests` flags override them. Kilo scores at most four questions per
+process; each process counts toward the request limit.
 
 The local modes are experimental: prompted models do not provide Jev's native
 scores, and a search can consume many subscription requests. Kilo stores normal
