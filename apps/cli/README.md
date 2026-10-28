@@ -122,8 +122,9 @@ a time and 12 requests per search. The ordinary `--concurrency` and
 
 The local modes are experimental: prompted models do not provide Jev's native
 scores, and a search can consume many subscription requests. Kilo stores normal
-session data and has substantial agent startup context. `--pure` changes output
-formatting, not that context. Check which account and
+session data. Jevgrep supplies Kilo a temporary one-step scoring agent that
+denies tools except reading the attached request. This reduced a small local
+probe from about 17,000 to 1,200 input tokens. Check which account and
 model each CLI is using before searching source you do not intend to send.
 
 ## Agent skill

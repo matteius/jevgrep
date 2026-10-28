@@ -29,7 +29,8 @@ key. Use `--model ID` when a stable model is available; it enables answer
 caching. Local scoring is experimental, is limited to 12 requests by default,
 and can consume substantial subscription usage. The original Jev benchmark
 does not apply to it. Run `jg doctor --local-provider NAME` before a search,
-and keep searches narrow.
+and keep searches narrow. The Kilo mode supplies a temporary one-step scoring
+agent to reduce Kilo's default agent context.
 
 ## Search
 

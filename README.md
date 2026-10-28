@@ -125,9 +125,11 @@ stable enough to cache safely. Local providers start one CLI process at a time
 and stop after 12 requests per search by default. Use `--max-requests` and
 `--concurrency` to change those bounds. Each process uses the selected CLI's
 normal account, limits, and billing configuration. Kilo's agent startup can
-consume substantial context even for a small scoring request (about 17,000
-input tokens in one local probe). `--pure` formats Kilo's output; it does not
-remove the agent's system prompt. Codex and Claude also add agent context.
+consume substantial context even for a small scoring request. This fork gives
+Kilo a temporary, one-step scoring agent with only read permission. In one
+small local probe, this used about 1,200 input tokens instead of about 17,000
+with Kilo's default agent. The agent still runs through Kilo, so usage varies
+by model and configuration. Codex and Claude also add agent context.
 
 These models return prompted numeric scores rather than Jev's native relevance
 judgments. The existing retrieval thresholds were tuned for Jev, so results

@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test";
 import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { delimiter, join } from "node:path";
+import { basename, delimiter, dirname, join } from "node:path";
 
 test("doctor checks a local Kilo provider without saved API credentials", async () => {
   const home = await mkdtemp(join(tmpdir(), "jevgrep-local-provider-"));
@@ -14,7 +14,7 @@ test("doctor checks a local Kilo provider without saved API credentials", async 
       "#!/usr/bin/env node\n" +
         'const fs = require("node:fs");\n' +
         'const args = process.argv; const file = args[args.indexOf("--file") + 1];\n' +
-        'fs.writeFileSync(process.env.JG_PROBE, JSON.stringify({args, prompt:file ? fs.readFileSync(file,"utf8") : ""}));\n' +
+        'fs.writeFileSync(process.env.JG_PROBE, JSON.stringify({args, prompt:file ? fs.readFileSync(file,"utf8") : "", config:process.env.KILO_CONFIG_CONTENT}));\n' +
         'console.log(JSON.stringify({type:"text",part:{text:"{\\\"relevant\\\":0.95}"}}));\n',
     );
     await chmod(command, 0o755);
@@ -36,6 +36,7 @@ test("doctor checks a local Kilo provider without saved API credentials", async 
           XDG_CACHE_HOME: join(home, "cache"),
           PATH: `${bin}${delimiter}${process.env.PATH}`,
           JG_PROBE: probe,
+          KILO_CONFIG_CONTENT: '{"provider":{"local":{"name":"Existing"}}}',
         },
         stdout: "pipe",
         stderr: "pipe",
@@ -49,9 +50,25 @@ test("doctor checks a local Kilo provider without saved API credentials", async 
     expect(code).toBe(0);
     expect(stderr).toBe("");
     expect(stdout).toContain("verified through Kilo CLI");
-    const invoked = JSON.parse(await readFile(probe, "utf8")) as { args: string[]; prompt: string };
+    const invoked = JSON.parse(await readFile(probe, "utf8")) as {
+      args: string[];
+      prompt: string;
+      config: string;
+    };
     expect(invoked.args.join(" ")).not.toContain("Does this source implement recording an event?");
     expect(invoked.prompt).toContain("Does this source implement recording an event?");
+    const agentName = invoked.args[invoked.args.indexOf("--agent") + 1];
+    const requestFile = invoked.args[invoked.args.indexOf("--file") + 1]!;
+    const config = JSON.parse(invoked.config);
+    expect(config.provider.local.name).toBe("Existing");
+    expect(config.agent[agentName]).toMatchObject({
+      mode: "primary",
+      steps: 1,
+      permission: {
+        "*": "deny",
+        read: { "*": "deny", [`**/${basename(dirname(requestFile))}/request.txt`]: "allow" },
+      },
+    });
   } finally {
     await rm(home, { recursive: true, force: true });
   }
