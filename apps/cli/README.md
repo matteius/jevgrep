@@ -121,8 +121,9 @@ a time and 12 requests per search. The ordinary `--concurrency` and
 `--max-requests` flags override them. Kilo scores at most four questions per
 process; each process counts toward the request limit.
 
-The local modes are experimental: prompted models do not provide Jev's native
-scores, and a search can consume many subscription requests. Kilo stores normal
+The local modes are research only: prompted models do not provide Jev's native
+probabilities, and a search can consume many subscription requests or miss
+relevant source. `jg doctor` checks only one synthetic response. Kilo stores normal
 session data. Jevgrep supplies Kilo a temporary one-step scoring agent that
 denies tools except reading the attached request. This reduced a small local
 probe from about 17,000 to 1,200 input tokens. Check which account and

@@ -2,8 +2,10 @@
 
 # jevgrep
 
-This fork also has experimental local CLI providers. The benchmark figures below
-measure the original Jev transport; they do not describe the local providers.
+This fork also has experimental local CLI scorers. They do not preserve Jev's
+native probability contract, so this branch is research only and should not
+replace a working toolbox command. See the [subscription scorer assessment](specs/subscription-scorers.md).
+The benchmark figures below measure the original Jev transport.
 
 [![npm](https://img.shields.io/npm/v/@dzhng/jevgrep?style=flat-square&color=ef5638)](https://www.npmjs.com/package/@dzhng/jevgrep)
 [![MIT license](https://img.shields.io/badge/license-MIT-blue?style=flat-square)](LICENSE)

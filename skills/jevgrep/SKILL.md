@@ -26,9 +26,10 @@ variables. Do not request API keys in chat.
 This fork also supports `--local-provider kilo|codex|claude` on searches and
 `jg doctor`. These modes use the selected CLI's existing login and need no Jev
 key. Use `--model ID` when a stable model is available; it enables answer
-caching. Local scoring is experimental, is limited to 12 requests by default,
-and can consume substantial subscription usage. The original Jev benchmark
-does not apply to it. Run `jg doctor --local-provider NAME` before a search,
+caching. Local scoring is research only, is limited to 12 requests by default,
+and can consume substantial subscription usage or miss relevant source. The
+original Jev benchmark does not apply to it. `jg doctor --local-provider NAME`
+checks one synthetic response, not retrieval quality. Run it before a search,
 and keep searches narrow. The Kilo mode supplies a temporary one-step scoring
 agent to reduce Kilo's default agent context.
 

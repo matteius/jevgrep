@@ -90,7 +90,7 @@ async function main() {
           throw new CliError(`${label} returned an unexpected answer to the connection check.`);
         await write(
           command.localProvider
-            ? `Local scoring verified through ${label}.\n`
+            ? `${label} answered one synthetic check; retrieval quality is unverified.\n`
             : `Jev connection verified through ${label}.\n`,
         );
       } catch (error) {

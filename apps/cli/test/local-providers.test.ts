@@ -50,7 +50,7 @@ test("doctor checks a local Kilo provider without saved API credentials", async 
     ]);
     expect(code).toBe(0);
     expect(stderr).toBe("");
-    expect(stdout).toContain("verified through Kilo CLI");
+    expect(stdout).toContain("Kilo CLI answered one synthetic check; retrieval quality is unverified");
     const invoked = JSON.parse(await readFile(probe, "utf8")) as {
       args: string[];
       prompt: string;
@@ -121,7 +121,7 @@ test("Codex local provider sends the scoring request on stdin and reads its fina
     ]);
     expect(code).toBe(0);
     expect(stderr).toBe("");
-    expect(stdout).toContain("verified through Codex CLI");
+    expect(stdout).toContain("Codex CLI answered one synthetic check; retrieval quality is unverified");
     const invoked = JSON.parse(await readFile(probe, "utf8")) as { args: string[]; input: string };
     expect(invoked.args.join(" ")).not.toContain("Does this source implement recording an event?");
     expect(invoked.input).toContain("Does this source implement recording an event?");
@@ -176,7 +176,7 @@ test("Claude local provider reads its signed-in CLI result without a Jev key", a
     ]);
     expect(code).toBe(0);
     expect(stderr).toBe("");
-    expect(stdout).toContain("verified through Claude Code CLI");
+    expect(stdout).toContain("Claude Code CLI answered one synthetic check; retrieval quality is unverified");
     const invoked = JSON.parse(await readFile(probe, "utf8")) as { args: string[]; input: string };
     expect(invoked.args.join(" ")).not.toContain("Does this source implement recording an event?");
     expect(invoked.input).toContain("Does this source implement recording an event?");
